@@ -1,4 +1,15 @@
 import {configureStore} from '@reduxjs/toolkit';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  persistStore,
+  persistReducer,
+  FLUSH,
+  REHYDRATE,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+} from 'redux-persist';
 import HomeReducer from '../slice/HomeSlice';
 import authReducer from '../slice/authSlice';
 import nearestResReucer from '../slice/nearestResSlice';
@@ -29,6 +40,14 @@ import GetAllCategoryReducer from '../slice/GetAllCategorySlice';
 import CategoriSliceReducer from '../slice/CategoriSlice';
 import modalReducer from '../slice/ModalSlice'
 import allSubCategoryReducer from '../slice/AllSubCategorySlice'
+
+const cartPersistConfig = {
+  key: 'cart',
+  storage: AsyncStorage,
+};
+
+const persistedCartReducer = persistReducer(cartPersistConfig, cartReucer);
+
 const store = configureStore({
   reducer: {
     home: HomeReducer,
@@ -37,7 +56,7 @@ const store = configureStore({
     restaurants: AllRestaurantReucer,
     banners: bannerReucer,
     allFoods: AllFoodsReucer,
-    cart: cartReucer,
+    cart: persistedCartReducer,
     address: addressReucer,
     foodCategory: foodCategoryReducer,
     foodCustomization: foodCustomizationReducer,
@@ -62,6 +81,13 @@ const store = configureStore({
     modal:modalReducer,
    allSubCategory: allSubCategoryReducer,
   },
+    middleware: getDefaultMiddleware =>
+      getDefaultMiddleware({
+        serializableCheck: {
+          ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+        },
+      }),
 });
 
+  export const persistor = persistStore(store);
 export default store;
