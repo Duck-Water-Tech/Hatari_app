@@ -95,9 +95,7 @@ const OrderSummary = () => {
               key={item._id || index}
               style={styles.orderCard}
               activeOpacity={0.9}
-              onPress={() =>
-                navigation.navigate('OrderDetailsScreen', {order: item})
-              }>
+            >
               {/* Restaurant Header */}
               <View style={styles.headerRow}>
                 <Image

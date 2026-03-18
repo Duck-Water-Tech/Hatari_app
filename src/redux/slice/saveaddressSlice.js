@@ -39,7 +39,8 @@ const saveAddressSlice = createSlice({
       })
       .addCase(fetchUserAddresses.fulfilled, (state, action) => {
         state.loading = false;
-        state.addresses = action.payload?.addresses || ["hhhh"];
+        state.addresses =
+          action.payload?.addresses || action.payload?.data?.addresses || [];
       })
       .addCase(fetchUserAddresses.rejected, (state, action) => {
         state.loading = false;

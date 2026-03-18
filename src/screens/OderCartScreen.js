@@ -50,16 +50,30 @@ const OderCartScreen = () => {
 
   const formatCurrency = amount => `₹${amount.toLocaleString('en-IN')}`;
 
-  const incrementQty = (id, currentQty) => {
-    dispatch(updateQuantity({id, quantity: currentQty + 1}));
-  };
-  const decrementQty = (id, currentQty) => {
+  const getLinePayload = item => ({
+    id: item.id,
+    selectedOption: item.selectedOption,
+    selectedAddOns: item.selectedAddOns || [],
+  });
+
+  const incrementQty = item => {
     dispatch(
-      updateQuantity({id, quantity: currentQty > 1 ? currentQty - 1 : 1}),
+      updateQuantity({
+        ...getLinePayload(item),
+        quantity: item.quantity + 1,
+      }),
     );
   };
-  const deleteItem = id => {
-    dispatch(removeFromCart(id));
+  const decrementQty = item => {
+    dispatch(
+      updateQuantity({
+        ...getLinePayload(item),
+        quantity: item.quantity > 1 ? item.quantity - 1 : 1,
+      }),
+    );
+  };
+  const deleteItem = item => {
+    dispatch(removeFromCart(getLinePayload(item)));
   };
 
   // const openModal = item => {
@@ -80,7 +94,12 @@ const OderCartScreen = () => {
     if (!selectedItem) return;
 
     try {
-      dispatch(updateNote({id: selectedItem.id, note: noteText}));
+      dispatch(
+        updateNote({
+          ...getLinePayload(selectedItem),
+          note: noteText,
+        }),
+      );
 
       const resultAction = await dispatch(
         postCustomizedFood({
@@ -176,7 +195,7 @@ const OderCartScreen = () => {
 
             <TouchableOpacity
               style={styles.deleteBtn}
-              onPress={() => deleteItem(item.id)}>
+              onPress={() => deleteItem(item)}>
               <Ionicons name="trash-outline" size={18} color="red" />
               <Text style={styles.deleteText}>Remove</Text>
             </TouchableOpacity>
@@ -193,7 +212,7 @@ const OderCartScreen = () => {
         <View style={styles.quantityBox}>
           <TouchableOpacity
             style={styles.qtyBtn}
-            onPress={() => decrementQty(item.id, item.quantity)}>
+            onPress={() => decrementQty(item)}>
             <Text style={styles.qtyText}>-</Text>
           </TouchableOpacity>
 
@@ -201,7 +220,7 @@ const OderCartScreen = () => {
 
           <TouchableOpacity
             style={styles.qtyBtn}
-            onPress={() => incrementQty(item.id, item.quantity)}>
+            onPress={() => incrementQty(item)}>
             <Text style={styles.qtyText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -262,7 +281,11 @@ const OderCartScreen = () => {
                 <>
                   <FlatList
                     data={cartItems}
-                    keyExtractor={item => item.id}
+                    keyExtractor={(item, index) =>
+                      `${item.id || 'unknown'}-${item.selectedOption || 'full'}-${
+                        (item.selectedAddOns || []).map(a => a.name).join('|') || 'no-addons'
+                      }-${index}`
+                    }
                     renderItem={renderItem}
                     contentContainerStyle={{paddingBottom: height * 0.15}}
                     showsVerticalScrollIndicator={false}
@@ -280,15 +303,32 @@ const OderCartScreen = () => {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}>
-                      <Text
-                        style={{
-                          fontSize: width * 0.035,
-                          color: '#555',
-                          textAlign: 'center',
-                        }}>
-                        🛒 Oops! Your cart is lonely. Tap "Continue" to see all
-                        the goodies!
-                      </Text>
+                {cartItems?.length === 0 ? (
+
+  <Text
+    style={{
+      fontSize: width * 0.035,
+      color: '#999',
+      textAlign: 'center',
+      marginTop: 20,
+    }}>
+    🛒 Your cart is empty. Start adding tasty food!
+  </Text>
+
+) : (
+
+  <Text
+    style={{
+      fontSize: width * 0.035,
+      color: '#28a745',
+      textAlign: 'center',
+      marginTop: 10,
+      fontWeight: '600',
+    }}>
+    🎉 Great! You have {cartItems.length} item(s) in your cart
+  </Text>
+
+)}
                     </View>
 
                     <TouchableOpacity

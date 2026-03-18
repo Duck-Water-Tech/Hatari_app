@@ -10,6 +10,7 @@ import ProfileScreen from '../screens/BottomScreen/ProfileScreen';
 
 import MenuScreen from '../screens/BottomScreen/MenuScreen';
 import OrderSummary from '../screens/BottomScreen/OrderSummary';
+import ItemDetalis from '../screens/ItemDetalis';
 
 const Tab = createBottomTabNavigator();
 
@@ -84,7 +85,7 @@ const Bottom = () => {
           />
           <Tab.Screen
             name="OrderSummary"
-            component={OrderSummary}
+            component={ItemDetalis}
             options={{ tabBarLabel: 'Orders' }}
           />
           <Tab.Screen

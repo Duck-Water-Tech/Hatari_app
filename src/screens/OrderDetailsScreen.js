@@ -62,41 +62,70 @@ const OrderDetailsScreen = ({route}) => {
   const {selectedRestaurant, experienceType} = useSelector(
     state => state.experience,
   );
-// ✅ DEFINE FIRST
-const getItemPrice = item => {
-  if (item.variant === 'full') {
-    return item.fullPrice ?? item.foodId?.priceInfo?.fullPrice ?? 0;
-  }
+  const toNumber = value => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  };
 
-  if (item.variant === 'half') {
-    return item.halfPrice ?? item.foodId?.priceInfo?.halfPrice ?? 0;
-  }
+  const getItemPrice = item => {
+    const variant = String(item?.variant || '').toLowerCase();
 
-  return (
-    item.price ??
-    item.foodId?.priceInfo?.fullPrice ??
-    item.foodId?.priceInfo?.halfPrice ??
-    0
+    if (variant === 'full' || variant === 'fullprice') {
+      return toNumber(item?.fullPrice ?? item?.foodId?.priceInfo?.fullPrice ?? 0);
+    }
+
+    if (variant === 'half' || variant === 'halfprice') {
+      return toNumber(item?.halfPrice ?? item?.foodId?.priceInfo?.halfPrice ?? 0);
+    }
+
+    return toNumber(
+      item?.unitPrice ??
+        item?.price ??
+        item?.foodId?.priceInfo?.staticPrice ??
+        item?.foodId?.priceInfo?.fullPrice ??
+        item?.foodId?.priceInfo?.halfPrice ??
+        0,
+    );
+  };
+
+  const getItemAddOnsTotal = item => {
+    const addOns = item?.addOns || item?.selectedAddOns || [];
+    return addOns.reduce(
+      (sum, addOn) => sum + toNumber(addOn?.price) * toNumber(addOn?.quantity || 1),
+      0,
+    );
+  };
+
+  const foodprices = (order?.foodDetails || []).reduce((total, item) => {
+    const qty = toNumber(item?.quantity || 1);
+    const itemBase = getItemPrice(item);
+    const addOnsTotal = getItemAddOnsTotal(item);
+    return total + (itemBase + addOnsTotal) * qty;
+  }, 0);
+
+  const foodPrices = toNumber(foodprices);
+  const deliveryCharges = toNumber(order?.deliveryCharges);
+  const convenienceCharges = toNumber(order?.convenienceCharges);
+  const packingCharge = toNumber(order?.packingCharge);
+  const discount = toNumber(order?.discount);
+  const cgst = toNumber(order?.CGST);
+  const sgst = toNumber(order?.SGST);
+
+  const calculatedTotal = Math.max(
+    foodPrices +
+      deliveryCharges +
+      convenienceCharges +
+      packingCharge +
+      cgst +
+      sgst -
+      discount,
+    0,
   );
-};
 
-// ✅ THEN USE IT
-const foodprices = order?.foodDetails.reduce((total, item) => {
-  const unitPrice = getItemPrice(item);
-  const qty = Number(item.quantity || 1);
-  return total + unitPrice * qty;
-}, 0);
-
-const foodPrices = Number(foodprices || 0);
-const discount = Number(order?.discount || 0);
-const cgst = Number(order?.CGST || 0);
-const sgst = Number(order?.SGST || 0);
-
-const taxableAmount = Math.max(foodPrices - discount, 0);
-
-const totalAmountPrice = Number(
-  (taxableAmount + cgst + sgst).toFixed(2)
-);
+  const totalAmountPrice =
+    order?.totalAmount !== undefined && order?.totalAmount !== null
+      ? toNumber(order?.totalAmount)
+      : Number(calculatedTotal.toFixed(2));
 
 console.log('Total Amount:', totalAmountPrice);
 
@@ -108,7 +137,16 @@ console.log('Total Amount:', totalAmountPrice);
   const foodDetails = order?.foodDetails || [];
   console.log(foodDetails, 'foodDetails');
 
-  const address = order?.address || {};
+  const address =
+    order?.address && typeof order?.address === 'object' ? order.address : {};
+  const addressName = address?.name || order?.billingName || 'Customer';
+  const addressPhone =
+    address?.mobileNumber || address?.contact || order?.billingMobile || 'N/A';
+  const addressLine =
+    address?.address ||
+    [address?.house, address?.street, address?.city, address?.state, address?.pincode]
+      .filter(Boolean)
+      .join(', ');
 
   const status = order?.deliveryStatus || 'Ordered';
 
@@ -169,7 +207,7 @@ console.log('Total Amount:', totalAmountPrice);
                   />
                   <Text style={styles.foodName}>{item?.foodId?.name}</Text>
                   <Text style={styles.foodQtyPrice}>Qty: {item?.quantity}</Text>
-                  <Text style={styles.foodPrice}>₹{getItemPrice(item)}</Text>
+                  <Text style={styles.foodPrice}>₹{getItemPrice(item) }</Text>
 
                   <Text style={styles.foodPrice}>{item?.note}</Text>
                 </View>
@@ -183,9 +221,9 @@ console.log('Total Amount:', totalAmountPrice);
             <View style={styles.infoRow}>
               <MaterialIcons name="location-on" size={22} color="#FF6347" />
               <View style={{marginLeft: 10}}>
-                <Text style={styles.infoText}>{address?.name}</Text>
-                <Text style={styles.infoText}>{address?.address}</Text>
-                <Text style={styles.infoText}>{address?.mobileNumber}</Text>
+                <Text style={styles.infoText}>{addressName}</Text>
+                <Text style={styles.infoText}>{addressLine || 'Address not available'}</Text>
+                <Text style={styles.infoText}>{addressPhone}</Text>
               </View>
             </View>
           </View>
@@ -203,7 +241,7 @@ console.log('Total Amount:', totalAmountPrice);
               <View style={styles.chargeRow}>
                 <Text style={styles.chargeText}>Delivery</Text>
                 <Text style={styles.chargeText}>
-                  ₹{order?.deliveryCharges || 0}
+                  ₹{deliveryCharges.toFixed(2)}
                 </Text>
               </View>
             )}
@@ -211,26 +249,26 @@ console.log('Total Amount:', totalAmountPrice);
             <View style={styles.chargeRow}>
               <Text style={styles.chargeText}>Convenience</Text>
               <Text style={styles.chargeText}>
-                ₹{order?.convenienceCharges || 0}
+                ₹{convenienceCharges.toFixed(2)}
               </Text>
             </View>
             <View style={styles.chargeRow}>
               <Text style={styles.chargeText}>packingCharge</Text>
               <Text style={styles.chargeText}>
-                ₹{order?.packingCharge || 0}
+                ₹{packingCharge.toFixed(2)}
               </Text>
             </View>
             <View style={styles.chargeRow}>
               <Text style={styles.chargeText}>CGST</Text>
-              <Text style={styles.chargeText}>₹{order?.CGST || 0}</Text>
+              <Text style={styles.chargeText}>₹{cgst.toFixed(2)}</Text>
             </View>
             <View style={styles.chargeRow}>
               <Text style={styles.chargeText}>SGST</Text>
-              <Text style={styles.chargeText}>₹{order?.SGST || 0}</Text>
+              <Text style={styles.chargeText}>₹{sgst.toFixed(2)}</Text>
             </View>
             <View style={styles.chargeRow}>
               <Text style={styles.chargeText}>discount</Text>
-              <Text style={styles.chargeText}>₹{order?.discount || 0}</Text>
+              <Text style={styles.chargeText}>-₹{discount.toFixed(2)}</Text>
             </View>
             <View style={[styles.chargeRow, {marginTop: 8}]}>
               <Text
@@ -245,7 +283,7 @@ console.log('Total Amount:', totalAmountPrice);
                   styles.chargeText,
                   {fontWeight: 'bold', color: '#FF6347'},
                 ]}>
-                ₹{totalAmountPrice || 0}
+                ₹{totalAmountPrice.toFixed(2)}
               </Text>
             </View>
           </View>

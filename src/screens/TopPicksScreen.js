@@ -179,7 +179,8 @@ const TopPicksScreen = () => {
       addToCart({
         ...selectedFood,
         quantity,
-        option: selectedOption,
+        selectedOption,
+        hasVariation: !!selectedFood?.priceInfo?.hasVariation,
         selectedAddOns,
         totalPrice,
       })

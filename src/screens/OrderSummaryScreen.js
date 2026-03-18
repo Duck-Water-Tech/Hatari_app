@@ -416,14 +416,7 @@ const OrderSummaryScreen = () => {
                   <Text style={{fontWeight: '600', marginTop: 10}}>
                     {item.name}
                   </Text>
-                  {item.selectedAddOns.map((a, i) => (
-                    <View key={i} style={styles.billRow}>
-                      <Text style={styles.billLabel}>{a.name}</Text>
-                      <Text style={styles.billLabel}>
-                        {formatCurrency(a.price)}
-                      </Text>
-                    </View>
-                  ))}
+               
                 </View>
               ) : null,
             )}

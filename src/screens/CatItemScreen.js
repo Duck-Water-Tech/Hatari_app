@@ -221,7 +221,8 @@ const [initialLoading, setInitialLoading] = useState(true);
     dispatch(
       addToCart({
         ...selectedFood,
-        option: selectedOption,
+        selectedOption,
+        hasVariation: !!selectedFood?.priceInfo?.hasVariation,
         quantity,
         totalPrice,
       })

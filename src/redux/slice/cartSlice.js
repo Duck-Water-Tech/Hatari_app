@@ -1,5 +1,19 @@
 import {createSlice} from '@reduxjs/toolkit';
 
+const getLineId = item => item?.id || item?._id || item?.foodId;
+const getLineOption = item =>
+  item?.selectedOption ||
+  item?.option ||
+  (item?.priceInfo?.hasVariation ? 'half' : 'full');
+const getAddOnsSignature = item => JSON.stringify(item?.selectedAddOns || []);
+const isSameLine = (cartItem, target) => {
+  return (
+    getLineId(cartItem) === getLineId(target) &&
+    getLineOption(cartItem) === getLineOption(target) &&
+    getAddOnsSignature(cartItem) === getAddOnsSignature(target)
+  );
+};
+
 const cartSlice = createSlice({
   name: 'cart',
   initialState: {
@@ -9,14 +23,15 @@ const cartSlice = createSlice({
   reducers: {
 addToCart: (state, action) => {
   const newItem = action.payload;
-  const selectedAddOns = newItem.selectedAddOns || []; 
+  const selectedAddOns = newItem.selectedAddOns || [];
+  const selectedOption = getLineOption(newItem);
+  const itemId = getLineId(newItem);
+  const hasVariation =
+    typeof newItem.hasVariation === 'boolean'
+      ? newItem.hasVariation
+      : !!newItem?.priceInfo?.hasVariation;
   // const addOnTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
-const existingItem = state.items.find(
-  i =>
-    i.id === newItem.id &&
-    i.selectedOption === newItem.selectedOption &&
-    JSON.stringify(i.selectedAddOns || []) === JSON.stringify(newItem.selectedAddOns || [])
-);
+const existingItem = state.items.find(i => isSameLine(i, newItem));
 
 
 
@@ -36,19 +51,19 @@ const existingItem = state.items.find(
     };
 
     // Determine final unit price
-    const unitPrice = priceInfo.staticPrice
-      ? Number(priceInfo.staticPrice)
-      : newItem.selectedOption === "half"
-      ? Number(priceInfo.halfPrice)
-      : Number(priceInfo.fullPrice);
+    const unitPrice = hasVariation
+      ? selectedOption === 'half'
+        ? Number(priceInfo.halfPrice || 0)
+        : Number(priceInfo.fullPrice || 0)
+      : Number(priceInfo.staticPrice || newItem.unitPrice || newItem.totalPrice || 0);
 
     state.items.push({
-      id: newItem._id,
+      id: itemId,
       name: newItem.name,
       image: newItem.image,
       quantity: newItem.quantity || 1,
-      selectedOption: newItem.selectedOption || "full",
-      hasVariation: newItem.hasVariation || false,
+      selectedOption,
+      hasVariation,
       note: newItem.note || "",
       priceInfo,
       unitPrice,
@@ -112,20 +127,37 @@ const existingItem = state.items.find(
 // },
  
     removeFromCart: (state, action) => {
-      const id = action.payload;
-      state.items = state.items.filter(i => i.id !== id);
+      const target = action.payload;
+
+      // Backward compatibility: payload can still be a plain id
+      if (typeof target === 'string') {
+        state.items = state.items.filter(i => i.id !== target);
+        return;
+      }
+
+      state.items = state.items.filter(i => !isSameLine(i, target));
     },
 
     updateQuantity: (state, action) => {
-      const {id, quantity} = action.payload;
-      const item = state.items.find(i => i.id === id);
+      const {quantity, ...target} = action.payload;
+      const item = state.items.find(i => {
+        if (target?.selectedOption || target?.selectedAddOns) {
+          return isSameLine(i, target);
+        }
+        return i.id === target.id;
+      });
       if (item) {
         item.quantity = Math.max(1, quantity); // prevent zero/negative
       }
     },
     updateNote: (state, action) => {
-      const {id, note} = action.payload;
-      const item = state.items.find(i => i.id === id);
+      const {note, ...target} = action.payload;
+      const item = state.items.find(i => {
+        if (target?.selectedOption || target?.selectedAddOns) {
+          return isSameLine(i, target);
+        }
+        return i.id === target.id;
+      });
       if (item) item.note = note;
     },
 

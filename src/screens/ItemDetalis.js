@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import {fetchFoodOrders} from '../redux/slice/getfoodorderSlice';
+import {fetchUserAddresses} from '../redux/slice/saveaddressSlice';
 import DashboardScreen from '../components/DashboardScreen';
 import CustomHeader from '../components/CustomHeader';
 import {CommonActions, useFocusEffect, useNavigation} from '@react-navigation/native';
@@ -22,11 +23,10 @@ const ItemDetalis = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const {orders, loading, error} = useSelector(state => state.foodOrder);
-  console.log(orders,"--------------------------------***********");
-  
+  const {addresses = []} = useSelector(state => state.address);
 
-  
   const orderData = orders?.data || [];
+    
 useFocusEffect(
   useCallback(() => {
     const backHandler = BackHandler.addEventListener(
@@ -55,6 +55,7 @@ useFocusEffect(
 
   useEffect(() => {
     dispatch(fetchFoodOrders());
+    dispatch(fetchUserAddresses());
   }, [dispatch]);
 
   if (loading)
@@ -85,36 +86,108 @@ useFocusEffect(
       </View>
     );
 
+  const toNumber = value => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  };
+
   const getSelectedPrice = food => {
-  
-    
-    if (!food) return 0;   
-    if (food?.variant === 'fullPrice') return Number(food?.fullPrice || 0);
-    if (food?.variant === 'halfPrice') return Number(food?.halfPrice || 0);
-    return Number(food?.price || food?.fullPrice || food?.halfPrice || 0);
+    if (!food) return 0;
+
+    const variant = String(food?.variant || '').toLowerCase();
+    if (variant === 'full' || variant === 'fullprice') {
+      return toNumber(
+        food?.fullPrice ??
+          food?.priceInfo?.fullPrice ??
+          food?.foodId?.priceInfo?.fullPrice ??
+          0,
+      );
+    }
+
+    if (variant === 'half' || variant === 'halfprice') {
+      return toNumber(
+        food?.halfPrice ??
+          food?.priceInfo?.halfPrice ??
+          food?.foodId?.priceInfo?.halfPrice ??
+          0,
+      );
+    }
+
+    return toNumber(
+      food?.unitPrice ??
+        food?.price ??
+        food?.totalPrice ??
+        food?.priceInfo?.staticPrice ??
+        food?.foodId?.priceInfo?.staticPrice ??
+        food?.fullPrice ??
+        food?.halfPrice ??
+        food?.foodId?.priceInfo?.fullPrice ??
+        food?.foodId?.priceInfo?.halfPrice ??
+        0,
+    );
   };
 
   const getAddOnsTotal = food => {
     if (!food?.addOns || food.addOns.length === 0) return 0;
     return food.addOns.reduce(
-      (sum, addon) => sum + Number(addon.price || 0) * (addon.quantity || 1),
+      (sum, addon) => sum + toNumber(addon?.price) * toNumber(addon?.quantity || 1),
       0,
     );
   };
 
+  const resolveAddressInfo = item => {
+    const rawAddress = item?.address;
+    const addressId =
+      typeof rawAddress === 'string'
+        ? rawAddress
+        : rawAddress?._id || rawAddress?.id || rawAddress?.addressId;
+
+    const matchedAddress =
+      addresses.find(addr => addr?._id === addressId || addr?.id === addressId) || {};
+
+    const addressObj =
+      rawAddress && typeof rawAddress === 'object'
+        ? {...matchedAddress, ...rawAddress}
+        : matchedAddress;
+
+    const name = addressObj?.name || item?.billingName || 'Customer';
+    const phone =
+      addressObj?.mobileNumber || addressObj?.contact || item?.billingMobile || 'N/A';
+    const line =
+      addressObj?.address ||
+      [
+        addressObj?.apartment,
+        addressObj?.house,
+        addressObj?.street,
+        addressObj?.area,
+        addressObj?.city,
+        addressObj?.pin || addressObj?.pincode,
+        addressObj?.state,
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+    return {
+      name,
+      phone,
+      line,
+    };
+  };
+
   return (
     <>
-      <CustomHeader title="Order Summary" />
+      <CustomHeader title="My Order" />
       <DashboardScreen scrollable={false}>
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           {orderData.map((item, index) => {
-   console.log(item,"--------------------------------itemItemDetalis88888888888888888888888888888***********");
-   
-            
             const restaurant = item?.restaurant || {};
             const foodDetails = item?.foodDetails || [];
             const status = item?.deliveryStatus || 'Ordered';
             const paymentStatus = item?.paymentStatus || 0;
+            const orderId = item?._id ? `#${String(item._id).slice(-6).toUpperCase()}` : 'N/A';
+            const {name: addressName, phone: addressPhone, line: addressLine} =
+              resolveAddressInfo(item);
+            const isDelivery = String(item?.type || 'delivery').toLowerCase() === 'delivery';
             const statusColor =
               status === 'Delivered'
                 ? '#4BB543'
@@ -127,9 +200,7 @@ useFocusEffect(
                 key={item._id || index}
                 style={styles.orderCard}
                 activeOpacity={0.9}
-                onPress={() =>
-                  navigation.navigate('OrderDetailsScreen', {order: item})
-                }>
+             >
 
                 {/* RESTAURANT HEADER */}
                 <View style={styles.headerRow}>
@@ -145,6 +216,7 @@ useFocusEffect(
                     <Text style={styles.restaurantName}>
                       {restaurant?.name || 'Restaurant'}
                     </Text>
+                    <Text style={styles.orderMeta}>Order {orderId}</Text>
                   </View>
                   <View style={styles.statusBadge(statusColor)}>
                     <Text style={styles.statusBadgeText}>{status}</Text>
@@ -154,11 +226,10 @@ useFocusEffect(
                 {/* FOOD ITEMS */}
                 <View style={styles.foodListContainer}>
                   {foodDetails.map((food, idx) => {
-                    console.log(food,"-------------------food");
-                    
                     const basePrice = getSelectedPrice(food);
                     const addOnsTotal = getAddOnsTotal(food);
-                    const totalPrice = (basePrice + addOnsTotal) * (food?.quantity || 1);
+                    const quantity = toNumber(food?.quantity || 1);
+                    const totalPrice = (basePrice + addOnsTotal) * quantity;
 
                     return (
                       <View key={idx} style={styles.foodRow}>
@@ -178,9 +249,11 @@ useFocusEffect(
                           </Text>
                           <Text style={styles.foodDesc}>
                             Qty: {food?.quantity} |
-                            {food?.variant === 'fullPrice' && ' Full Price'}
-                            {food?.variant === 'halfPrice' && ' Half Price'}
-                            {food?.variant === null && ' Static Price'}
+                            {(food?.variant === 'fullPrice' || food?.variant === 'full') &&
+                              ' Full Price'}
+                            {(food?.variant === 'halfPrice' || food?.variant === 'half') &&
+                              ' Half Price'}
+                            {!food?.variant && ' Static Price'}
                           </Text>
 
                           {/* AddOns */}
@@ -188,7 +261,7 @@ useFocusEffect(
                             <View style={{marginTop: 4}}>
                               {food.addOns.map((ad, i) => (
                                 <Text key={i} style={styles.addOnText}>
-                                  ➤ {ad.name} (+₹{ad.price} × {ad.quantity})
+                                  {ad.name} (+₹{ad.price} x {ad.quantity})
                                 </Text>
                               ))}
                             </View>
@@ -197,14 +270,14 @@ useFocusEffect(
                           {/* Note */}
                           {food?.note && (
                             <Text style={[styles.foodDesc, {fontStyle: 'italic'}]}>
-                              📝 {food.note} 
+                              Note: {food.note}
                             </Text>
                           )}
                         </View>
 
                         {/* PRICE */}
                         <View style={styles.foodPriceBox}>
-                          <Text style={styles.foodPrice}>₹ {totalPrice}</Text>
+                          <Text style={styles.foodPrice}>₹ {totalPrice.toFixed(2)}</Text>
                         </View>
                       </View>
                     );
@@ -228,13 +301,19 @@ useFocusEffect(
                     </Text>
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.viewDetailsButton}
-                    onPress={() =>
-                      navigation.navigate('OrderDetailsScreen', {order: item})
-                    }>
-                    <Text style={styles.viewDetailsText}>View Details</Text>
-                  </TouchableOpacity>
+                  {isDelivery && (
+                    <View style={styles.addressBox}>
+                      <MaterialIcons name="location-on" size={20} color="#FF6347" />
+                      <View style={styles.addressContent}>
+                        <Text style={styles.addressTitle}>Delivery Address</Text>
+                        <Text style={styles.addressText}>{addressName}</Text>
+                        <Text style={styles.addressText}>
+                          {addressLine || 'Address not available'}
+                        </Text>
+                        <Text style={styles.addressText}>Phone: {addressPhone}</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -251,7 +330,12 @@ export default ItemDetalis;
 /* ---------------------- STYLES ---------------------- */
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f9f9f9', padding: 10},
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F2EE',
+    paddingHorizontal: 10,
+    paddingTop: 10,
+  },
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
 
   orderCard: {
@@ -260,10 +344,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     padding: 14,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowOffset: {width: 0, height: 4},
     shadowRadius: 6,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F2E3D8',
   },
 
   headerRow: {
@@ -282,6 +368,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#333',
   },
+  orderMeta: {
+    marginTop: 2,
+    color: '#8B7D72',
+    fontSize: 12,
+    fontWeight: '600',
+  },
 
   statusBadge: color => ({
     backgroundColor: color + '15',
@@ -299,7 +391,7 @@ const styles = StyleSheet.create({
 
   foodListContainer: {
     marginTop: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF9F6',
     borderRadius: 12,
     paddingVertical: 8,
   },
@@ -311,8 +403,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     borderRadius: 10,
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F6ECE5',
   },
 
   foodImage: {
@@ -335,7 +429,7 @@ const styles = StyleSheet.create({
 
   foodDesc: {
     fontSize: 13,
-    color: '#777',
+    color: '#6A6A6A',
     marginTop: 2,
   },
 
@@ -361,12 +455,12 @@ const styles = StyleSheet.create({
   },
 
   footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    rowGap: 10,
     marginTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#F2E9E2',
     paddingTop: 10,
   },
 
@@ -381,4 +475,26 @@ const styles = StyleSheet.create({
 
   errorText: {color: 'red', fontSize: 16, textAlign: 'center'},
   noDataText: {color: '#333', fontSize: 16, fontWeight: '600'},
+  addressBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF4EE',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FFD9C8',
+  },
+  addressContent: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  addressTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4B3F36',
+  },
+  addressText: {
+    fontSize: 12,
+    color: '#6D5C51',
+    marginTop: 2,
+  },
 });
