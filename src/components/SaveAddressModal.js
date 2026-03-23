@@ -25,6 +25,7 @@ import {
 
 import Theme from "../assets/theme";
 import { addAddress } from "../redux/slice/addressSlice";
+import { log } from "console";
 
 const { width } = Dimensions.get("window");
 const PLACEHOLDER_COLOR = "#999";
@@ -45,13 +46,18 @@ const SaveAddressModal = ({
   const { data: deliveryData } = useSelector(
     (state) => state.deliverySettings
   );
+    const { experienceId, selectedRestaurant } = useSelector(
+      state => state.experience
+    );
+    console.log(selectedRestaurant, "selectedRestaurant in save address modal");
+    
   const { loading } = useSelector((state) => state.address);
   const { experienceType } = useSelector((state) => state.experience);
 
   const minDistance = deliveryData?.minimum_distance || 10;
 
-  const restaurantLat = 22.5726;
-  const restaurantLng = 88.3639;
+  const restaurantLat = selectedRestaurant?.lat;
+  const restaurantLng = selectedRestaurant?.lng;
 
   const [selectedTag, setSelectedTag] = useState("Home");
   const [name, setName] = useState("");

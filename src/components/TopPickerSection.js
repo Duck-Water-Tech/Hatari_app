@@ -15,6 +15,8 @@ import { fetchPaginatedFoods, resetFoods } from '../redux/slice/foodSlice';
 const TopPickerSection = () => {
   const dispatch = useDispatch();
   const { items, loading, page, hasMore } = useSelector((state) => state.foods);
+  console.log(items, "hhhhhh-----toppicks---");
+  
 
   useEffect(() => {
     dispatch(fetchPaginatedFoods({ page: 1, limit: 10 }));

@@ -27,6 +27,7 @@ import {postBilling} from '../redux/slice/postBillingSlice';
 import {fetchUserAddresses} from '../redux/slice/saveaddressSlice';
 import {deleteUserAddress} from '../redux/slice/AddressDeleteSlice';
 import CustomHeader from '../components/CustomHeader';
+import {calculateTotalPackingCharge} from '../utils/packingChargesConfig';
 
 const {width} = Dimensions.get('window');
 
@@ -44,6 +45,8 @@ const OrderSummaryScreen = () => {
 
   const {token} = useSelector(state => state.auth);
   const {data} = useSelector(state => state.deliverySettings);
+  console.log(data, '------------------deliverySettings---------------------');
+  
   const couponState = useSelector(state => state.coupons);
 
   const couponList = couponState?.list?.data || [];
@@ -129,10 +132,19 @@ const OrderSummaryScreen = () => {
   );
   console.log(itemTotal, '------------------totalAmount---------------------');
 
-  const packingFee = cartItems.reduce(
-    (sum, item) => sum + (item.packagingCharges || 0),
-    0,
+  // Calculate packing fee:
+  // - Top 22 items (whitelist) = NO packing charge
+  // - All other API items = Apply packing_charge_per_item from backend settings
+  const packingFee = calculateTotalPackingCharge(
+    cartItems,
+    data?.packing_charge_per_item || 0,
   );
+  
+  console.log('🛵 PACKING FEE CALCULATION:');
+  console.log('   Packing Charge Per Item (from API):', data?.packing_charge_per_item || 0);
+  console.log('   Total Packing Fee:', packingFee);
+  console.log('   Cart Items:', cartItems.map(item => `${item.name} (Qty: ${item.quantity})`));
+  
 
   let discount = 0;
   if (selectedCoupon) {

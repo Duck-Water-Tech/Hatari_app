@@ -1,4 +1,5 @@
 import {createSlice} from '@reduxjs/toolkit';
+import {getPackingCharge} from '../../utils/packingChargesConfig';
 
 const getLineId = item => item?.id || item?._id || item?.foodId;
 const getLineOption = item =>
@@ -21,111 +22,115 @@ const cartSlice = createSlice({
   },
 
   reducers: {
-addToCart: (state, action) => {
-  const newItem = action.payload;
-  const selectedAddOns = newItem.selectedAddOns || [];
-  const selectedOption = getLineOption(newItem);
-  const itemId = getLineId(newItem);
-  const hasVariation =
-    typeof newItem.hasVariation === 'boolean'
-      ? newItem.hasVariation
-      : !!newItem?.priceInfo?.hasVariation;
-  // const addOnTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
-const existingItem = state.items.find(i => isSameLine(i, newItem));
+    addToCart: (state, action) => {
+      const newItem = action.payload;
+      const selectedAddOns = newItem.selectedAddOns || [];
+      const selectedOption = getLineOption(newItem);
+      const itemId = getLineId(newItem);
+      const hasVariation =
+        typeof newItem.hasVariation === 'boolean'
+          ? newItem.hasVariation
+          : !!newItem?.priceInfo?.hasVariation;
+      // const addOnTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
+      const existingItem = state.items.find(i => isSameLine(i, newItem));
 
+      if (existingItem) {
+        // Increase quantity
+        existingItem.quantity += newItem.quantity || 1;
 
+        // Recalculate price
+        existingItem.totalPrice =
+          existingItem.unitPrice * existingItem.quantity;
+      } else {
+        // Compute priceInfo cleanly
+        const priceInfo = {
+          halfPrice: newItem.priceInfo?.halfPrice || null,
+          fullPrice: newItem.priceInfo?.fullPrice || null,
+          staticPrice: newItem.priceInfo?.staticPrice || null,
+        };
 
-  if (existingItem) {
-    // Increase quantity
-    existingItem.quantity += newItem.quantity || 1;
+        // Determine final unit price
+        const unitPrice = hasVariation
+          ? selectedOption === 'half'
+            ? Number(priceInfo.halfPrice || 0)
+            : Number(priceInfo.fullPrice || 0)
+          : Number(
+              priceInfo.staticPrice ||
+                newItem.unitPrice ||
+                newItem.totalPrice ||
+                0,
+            );
 
-    // Recalculate price
-    existingItem.totalPrice = existingItem.unitPrice * existingItem.quantity;
+        state.items.push({
+          id: itemId,
+          name: newItem.name,
+          image: newItem.image,
+          quantity: newItem.quantity || 1,
+          selectedOption,
+          hasVariation,
+          note: newItem.note || '',
+          priceInfo,
+          unitPrice,
+          totalPrice: unitPrice * (newItem.quantity || 1),
+          restaurant: newItem.restaurant,
+          type: newItem.type,
+          selectedAddOns: selectedAddOns,
+          hasPackingCharge: getPackingCharge(newItem.name, 1) > 0 ? true : false,
+          // selectedOption: newItem.selectedOption,
+        });
+      }
+    },
+    // addToCart: (state, action) => {
+    //   const newItem = action.payload;
 
-  } else {
-    // Compute priceInfo cleanly
-    const priceInfo = {
-      halfPrice: newItem.priceInfo?.halfPrice || null,
-      fullPrice: newItem.priceInfo?.fullPrice || null,
-      staticPrice: newItem.priceInfo?.staticPrice || null,
-    };
+    //   const selectedAddOns = newItem.addOns || [];   // ⭐ Add-ons
 
-    // Determine final unit price
-    const unitPrice = hasVariation
-      ? selectedOption === 'half'
-        ? Number(priceInfo.halfPrice || 0)
-        : Number(priceInfo.fullPrice || 0)
-      : Number(priceInfo.staticPrice || newItem.unitPrice || newItem.totalPrice || 0);
+    //   // Add-on total
+    //   const addOnTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
 
-    state.items.push({
-      id: itemId,
-      name: newItem.name,
-      image: newItem.image,
-      quantity: newItem.quantity || 1,
-      selectedOption,
-      hasVariation,
-      note: newItem.note || "",
-      priceInfo,
-      unitPrice,
-      totalPrice: unitPrice * (newItem.quantity || 1),
-      restaurant: newItem.restaurant,
-      type: newItem.type,
-         selectedAddOns: selectedAddOns, 
-      // selectedOption: newItem.selectedOption,
-    });
-  } 
-},
-// addToCart: (state, action) => {
-//   const newItem = action.payload;
+    //   // Base price logic
+    //   const priceInfo = {
+    //     halfPrice: newItem.priceInfo?.halfPrice || null,
+    //     fullPrice: newItem.priceInfo?.fullPrice || null,
+    //     staticPrice: newItem.priceInfo?.staticPrice || null,
+    //   };
 
-//   const selectedAddOns = newItem.addOns || [];   // ⭐ Add-ons
+    //   const baseUnitPrice = priceInfo.staticPrice
+    //     ? Number(priceInfo.staticPrice)
+    //     : newItem.selectedOption === "half"
+    //     ? Number(priceInfo.halfPrice)
+    //     : Number(priceInfo.fullPrice);
 
-//   // Add-on total
-//   const addOnTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
+    //   const finalUnitPrice = baseUnitPrice + addOnTotal; // ⭐ Add-ons added here
 
-//   // Base price logic
-//   const priceInfo = {
-//     halfPrice: newItem.priceInfo?.halfPrice || null,
-//     fullPrice: newItem.priceInfo?.fullPrice || null,
-//     staticPrice: newItem.priceInfo?.staticPrice || null,
-//   };
+    //   // ❗ Unique key: same item + same option + same addons
+    //   const existingItem = state.items.find(
+    //     i =>
+    //       i.id === newItem.id &&
+    //       i.selectedOption === newItem.selectedOption &&
+    //       JSON.stringify(i.addOns) === JSON.stringify(selectedAddOns)
+    //   );
 
-//   const baseUnitPrice = priceInfo.staticPrice
-//     ? Number(priceInfo.staticPrice)
-//     : newItem.selectedOption === "half"
-//     ? Number(priceInfo.halfPrice)
-//     : Number(priceInfo.fullPrice);
+    //   if (existingItem) {
+    //     existingItem.quantity += newItem.quantity || 1;
+    //     existingItem.totalPrice = existingItem.quantity * finalUnitPrice;
+    //   } else {
+    //     state.items.push({
+    //       id: newItem.id,
+    //       name: newItem.name,
+    //       image: newItem.image,
+    //       quantity: newItem.quantity || 1,
+    //       selectedOption: newItem.selectedOption || "full",
+    //       addOns: selectedAddOns,             // ⭐ stored in cart
+    //       priceInfo,
+    //       unitPrice: finalUnitPrice,
+    //       totalPrice: finalUnitPrice * (newItem.quantity || 1),
+    //       restaurant: newItem.restaurant,
+    //       type: newItem.type,
+    //     });
+    //   }
+    // },
 
-//   const finalUnitPrice = baseUnitPrice + addOnTotal; // ⭐ Add-ons added here
-
-//   // ❗ Unique key: same item + same option + same addons
-//   const existingItem = state.items.find(
-//     i =>
-//       i.id === newItem.id &&
-//       i.selectedOption === newItem.selectedOption &&
-//       JSON.stringify(i.addOns) === JSON.stringify(selectedAddOns)
-//   );
-
-//   if (existingItem) {
-//     existingItem.quantity += newItem.quantity || 1;
-//     existingItem.totalPrice = existingItem.quantity * finalUnitPrice;
-//   } else {
-//     state.items.push({
-//       id: newItem.id,
-//       name: newItem.name,
-//       image: newItem.image,
-//       quantity: newItem.quantity || 1,
-//       selectedOption: newItem.selectedOption || "full",
-//       addOns: selectedAddOns,             // ⭐ stored in cart
-//       priceInfo,
-//       unitPrice: finalUnitPrice,
-//       totalPrice: finalUnitPrice * (newItem.quantity || 1),
-//       restaurant: newItem.restaurant,
-//       type: newItem.type,
-//     });
-//   }
-// },
- 
     removeFromCart: (state, action) => {
       const target = action.payload;
 
