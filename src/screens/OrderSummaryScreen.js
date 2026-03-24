@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -156,8 +157,8 @@ const OrderSummaryScreen = () => {
     if (itemTotal < selectedCoupon.minOrderAmount) discount = 0;
   }
 
-  const cgstAmt = data?.Cgst ? (itemTotal * parseFloat(data.Cgst)) / 100 : 0;
-  const sgstAmt = data?.Sgst ? (itemTotal * parseFloat(data.Sgst)) / 100 : 0;
+  const cgstAmt = data?.Cgst ? (itemTotal + packingFee) * parseFloat(data.Cgst) / 100 : 0;
+  const sgstAmt = data?.Sgst ? (itemTotal  + packingFee) * parseFloat(data.Sgst) / 100 : 0;
 
   let convenienceAmt = 0;
   if (data?.convenience_charges_type === 'percentage') {
@@ -204,74 +205,54 @@ const OrderSummaryScreen = () => {
   };
 
   const handleConfirmCOD = async () => {
+    const billingData = {
+      userId: userid,
+      restaurantId: selectedRestaurant?._id || '12345',
+      address: savedAddress?._id || '54321',
+      billingName: savedAddress?.name,
+      billingMobile:
+        savedAddress?.mobileNumber || savedAddress?.contact || '7864512300',
+      type: experienceType?.toLowerCase() || 'delivery',
+      deliveryCharges: Number(data?.delivery_charges_value) || 0,
+      foodDetails: cartItems.map(item => {
+        const quantity = Number(item.quantity || 1);
+
+        return {
+          foodId: item.id || item.foodId || item._id,
+          quantity,
+          variant: item.hasVariation ? item.selectedOption : null,
+          note: item?.note || '',
+          fullPrice:
+            item.hasVariation && item.selectedOption === 'full'
+              ? Number(item.priceInfo?.fullPrice || 0)
+              : null,
+          halfPrice:
+            item.hasVariation && item.selectedOption === 'half'
+              ? Number(item.priceInfo?.halfPrice || 0)
+              : null,
+          unitPrice: !item.hasVariation
+            ? Number(item.priceInfo?.staticPrice || item.unitPrice || 0)
+            : null,
+          addOns: (item.selectedAddOns || []).map(add => ({
+            name: add.name,
+            image: add.image || '',
+            type: add.type || '',
+            price: Number(add.price || 0),
+            quantity: add.quantity || 1,
+          })),
+        };
+      }),
+      totalAmount: grandTotal,
+      grossAmount: itemTotal,
+      packingCharge: packingFee,
+      CGST: cgstAmt,
+      SGST: sgstAmt,
+      couponCode: selectedCoupon?.code || null,
+      paymentStatus: 'Pending',
+    };
+
     try {
-      const billingData = {
-        userId: userid,
-        restaurantId: selectedRestaurant?._id || '12345',
-        address: savedAddress?._id || '54321',
-        billingName: savedAddress?.name,
-        billingMobile: savedAddress?.contact || '7864512300',
-        type: experienceType?.toLowerCase() || 'delivery',
-        deliveryCharges: Number(data?.delivery_charges_value) || 0,
-        // foodDetails: cartItems.map((item) => (
-
-        //   {
-        //   foodId: item.id || item.foodId,
-        //   quantity: Number(item.quantity),
-        //   variant: item.selectedOption,
-        // //  variant: item?.variant,
-        //   note: item.note || '',
-        //   price: item.hasVariation
-        //     ? item.selectedOption === 'full'
-        //       ? Number(item.priceInfo?.fullPrice)
-        //       : Number(item.priceInfo?.halfPrice)
-        //     : Number(item.totalPrice || item.priceInfo?.staticPrice),
-        //   addOns: (item.selectedAddOns || []).map((add) => ({
-        //     name: add.name,
-        //     image: add.image || '',
-        //     type: add.type || '',
-        //     price: Number(add.price || 0),
-        //   })),
-        // })),
-
-       foodDetails: cartItems.map(item => {
-        console.log(item,"--item---------------------",item);
-        
-  const quantity = Number(item.quantity || 1);
-  return {
-    foodId: item.id || item.foodId,
-    quantity,
-    variant: item.hasVariation ? item.selectedOption : null,
-    note:item?.note,
-    fullPrice: item.hasVariation && item.selectedOption === 'full'
-      ? Number(item.priceInfo?.fullPrice || 0)
-      : null,
-    halfPrice: item.hasVariation && item.selectedOption === 'half'
-      ? Number(item.priceInfo?.halfPrice || 0)
-      : null,
-    unitPrice: !item.hasVariation ? Number(item.priceInfo?.staticPrice || item.unitPrice || 0) : null,
-    addOns: (item.selectedAddOns || []).map(add => ({
-      name: add.name,
-      image: add.image || '',
-      type: add.type || '',
-      price: Number(add.price || 0),
-      quantity: add.quantity || 1,
-    })),
-  };
-}),
-
-
-        totalAmount: grandTotal,
-        grossAmount: itemTotal,
-        packingCharge: packingFee,
-        CGST: cgstAmt,
-        SGST: sgstAmt,
-        couponCode: selectedCoupon?.code || null,
-        paymentStatus: 'Pending',
-      };
-      console.log(billingData,"--------------------------billingDataoderSummary");
-      
-
+      console.log(billingData, '--------------------------billingDataoderSummary');
       await dispatch(postBilling(billingData)).unwrap();
       dispatch(clearCart());
       setCodModalVisible(false);
@@ -279,10 +260,9 @@ const OrderSummaryScreen = () => {
       ToastAndroid.show('Order placed successfully!', ToastAndroid.LONG);
       navigation.navigate('OrderSuccessScreen');
     } catch (e) {
+      console.log('Order confirmation failed:', e);
       ToastAndroid.show('Order failed. Try again.', ToastAndroid.SHORT);
     }
-    console.log(billingData,"-------------------------------billingData44444");
-    
   };
 
   const handleDeleteAddress = id => {
